@@ -21,7 +21,7 @@ public class Note {
 	
 	public void setNoteContent(String newContent)
 	{
-		content = newContent;
+		content = "note=" + newContent;
 	}
 	
 	public Note (byte[] data)

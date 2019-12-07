@@ -7,6 +7,8 @@ import javax.microedition.rms.RecordStoreException;
 import javax.microedition.rms.RecordStoreFullException;
 import javax.microedition.rms.RecordStoreNotOpenException;
 
+import org.bouncycastle.util.Store;
+
 public class DataManager {
 	private RecordStore stream;
 
@@ -22,36 +24,76 @@ public class DataManager {
 		}
 	}
 	
-	// this works because we assume to only have 1 note
-	public int getNoteId() throws RecordStoreException
+	public void deleteExistingRecords() throws RecordStoreException
 	{
-		try {
-			System.out.println("Number of records: "+stream.getNumRecords());
-			RecordEnumeration renum = stream.enumerateRecords(null, null, false);
-			if (renum.hasNextElement())
-			{
-				return renum.nextRecordId();
-			}
-			return -1000000;
-		}
-		catch (RecordStoreException rse)
+		RecordEnumeration renum = stream.enumerateRecords(null, null, false);
+		while (renum.hasNextElement())
 		{
-			rse.printStackTrace();
+			int id = renum.nextRecordId();
+			stream.deleteRecord(id);
 		}
-		return -1000000;
 	}
 	
-	public Note getOrCreateNote() throws RecordStoreException
+	public void populateEmptyRecordStore() throws RecordStoreException
 	{
-		int noteId = getNoteId();
-		if (noteId == -1000000)
+		if (stream.getNumRecords() == 0)
 		{
-			Note note = new Note("Example note");
-			createNote(note);
-			noteId = getNoteId();
+		    Note exampleNote = new Note("note=Somenote");
+		    createNote(exampleNote);
+		    Note exampleIV = new Note("iv=000102030405060708090a0b0c0d0e0f");
+		    createNote(exampleIV);
 		}
-		return getNote(noteId);
 	}
+	
+	public int[] getNoteIdsFromRecordStore() throws RecordStoreNotOpenException, InvalidRecordIDException
+	{
+		int ids[] = new int[2];
+		RecordEnumeration renum = stream.enumerateRecords(null, null, false);
+		int i = 0;
+		while (renum.hasNextElement())
+		{
+			ids[i] = renum.nextRecordId();
+			i++;
+		}
+		return ids;
+	}
+	
+	public Note[] getNotesFromRecordStore(int ids[]) throws RecordStoreNotOpenException, InvalidRecordIDException, RecordStoreException
+	{
+		Note notes[] = new Note[ids.length];
+		for (int i = 0; i < ids.length; i++)
+		{
+			notes[i] = getNote(ids[i]);
+		}
+		return notes;
+	}
+	
+	public String getNoteStartingWithChars(Note[] notes, String chars)
+	{
+		for (int i = 0; i < notes.length; i++)
+		{
+			String noteString = notes[i].getNoteContent();
+			if (noteString.startsWith(chars))
+			{
+				int start = chars.length();
+				return noteString.substring(start);
+			}
+		}
+		return "";
+	}
+	
+	public int getIdOfNoteStartingWithChars(int ids[], String chars) throws RecordStoreNotOpenException, InvalidRecordIDException, RecordStoreException
+	{
+		for (int i = 0; i < ids.length; i++)
+		{
+			if (getNote(ids[i]).getNoteContent().startsWith(chars))
+			{
+				return ids[i];
+			}
+		}
+		return -1;
+	}
+	
 	
 	public Note getNote(int noteId) throws RecordStoreNotOpenException, InvalidRecordIDException, RecordStoreException
 	{
@@ -110,11 +152,9 @@ public class DataManager {
 		}
 	}
 	
-	public void editNote(Note note) throws RecordStoreException
+	public void editNote(Note note, int noteId) throws RecordStoreException
 	{
 		try {
-			int noteId = getNoteId();
-			System.out.println("Id rekordu:"+noteId);
 			setNote(note, noteId);				
 		}
 		catch (RecordStoreException rse)
@@ -122,5 +162,10 @@ public class DataManager {
 			rse.printStackTrace();
 		}
 	
+	}
+
+	private int getNoteId() {
+		// TODO Auto-generated method stub
+		return 0;
 	}
 }

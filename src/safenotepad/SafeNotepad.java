@@ -3,14 +3,28 @@ package safenotepad;
 import javax.microedition.lcdui.*;
 import javax.microedition.midlet.MIDlet;
 import javax.microedition.midlet.MIDletStateChangeException;
+import javax.microedition.rms.InvalidRecordIDException;
 import javax.microedition.rms.RecordStoreException;
+import javax.microedition.rms.RecordStoreNotOpenException;
 
 public class SafeNotepad extends MIDlet implements CommandListener {
 	private DataManager store;
 	private Note note;
+	private String noteText;
+	private String newNoteText;
+	private Note iv;
+	private String placeholderNote = "Placeholder";
+	private String notePrefix = "note=";
+	private String ivPrefix = "iv=";
+	private int[] ids = new int[2];
+	private Note[] notes = new Note[2];
+	private int noteId;
+	private int ivId;
 	private TextField noteField;
+	private TextField newNoteField;
 	private TextField passwordField;
 	private TextField newPasswordField;
+	private TextField currentPasswordField;
 	private Ticker ticker;
 	private Display screen;
 	private Form loggedOutForm;
@@ -21,7 +35,14 @@ public class SafeNotepad extends MIDlet implements CommandListener {
 	public SafeNotepad() throws RecordStoreException
 	{
 		store = new DataManager("data");
-		note = store.getOrCreateNote();
+		store.deleteExistingRecords();
+		
+		store.populateEmptyRecordStore();
+		ids = store.getNoteIdsFromRecordStore();
+		noteId = store.getIdOfNoteStartingWithChars(ids, notePrefix);
+		ivId = store.getIdOfNoteStartingWithChars(ids, ivPrefix);
+		note = store.getNote(noteId);
+		iv = store.getNote(ivId);
 		
 		screen = Display.getDisplay(this);
 		loggedOutForm = new Form("Log in");
@@ -35,7 +56,7 @@ public class SafeNotepad extends MIDlet implements CommandListener {
 		
 		loggedInForm = new Form("Your note");
 		ticker = new Ticker("Safe Notepad");
-		noteField = new TextField("", note.getNoteContent(), 128, TextField.UNEDITABLE);
+		noteField = new TextField("", placeholderNote, 128, TextField.UNEDITABLE);
 		loggedInForm.append(noteField);
 		Command logout = new Command("Log out", Command.EXIT, 0);
 		loggedInForm.addCommand(logout);
@@ -47,21 +68,23 @@ public class SafeNotepad extends MIDlet implements CommandListener {
 		loggedInForm.setCommandListener(this);
 		
 		changeNoteForm = new Form("Change note");
-		noteField = new TextField(
-				"Your decrypted note: ", note.getNoteContent(), 128, TextField.ANY);
-		changeNoteForm.append(noteField);
-		Command cancel = new Command("Cancel", Command.EXIT, 0);
+		newNoteField = new TextField(
+				"New note: ", "", 128, TextField.ANY);
+		changeNoteForm.append(newNoteField);
+		Command cancel = new Command("Log out", Command.EXIT, 0);
 		changeNoteForm.addCommand(cancel);
 		Command saveNote = new Command("Save", Command.OK, 0);
 		changeNoteForm.addCommand(saveNote);
 		changeNoteForm.setCommandListener(this);
 		
 		changePasswordForm = new Form("Change password");
+		currentPasswordField = new TextField("Enter current password", "", 30, TextField.PASSWORD);
+		changePasswordForm.append(currentPasswordField);
 		newPasswordField = new TextField("Enter new password", "", 30, TextField.PASSWORD);
 		changePasswordForm.append(newPasswordField);
 		Command savePassword = new Command("Save", Command.OK, 0);
 		changePasswordForm.addCommand(savePassword);
-		Command cancelPasswordChange = new Command("Cancel", Command.EXIT, 0);
+		Command cancelPasswordChange = new Command("Log out", Command.EXIT, 0);
 		changePasswordForm.addCommand(cancelPasswordChange);
 		changePasswordForm.setCommandListener(this);
 		
@@ -83,24 +106,78 @@ public class SafeNotepad extends MIDlet implements CommandListener {
 		
 	}
 	
-	public void updateNotePreview()
+	public void updateNotePreview(String noteText)
 	{
-		TextField updatedNoteField = new TextField("", note.getNoteContent(), 128, TextField.UNEDITABLE);
+		TextField updatedNoteField = new TextField("", noteText, 128, TextField.UNEDITABLE);
 		loggedInForm.deleteAll();
 		loggedInForm.append(updatedNoteField);
+	}
+	
+	public void updateIds()
+	{
+		try {
+			ids = store.getNoteIdsFromRecordStore();
+		} catch (RecordStoreNotOpenException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvalidRecordIDException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public void updateNotes(int[] ids)
+	{
+		try {
+			notes = store.getNotesFromRecordStore(ids);
+		} catch (RecordStoreNotOpenException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvalidRecordIDException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (RecordStoreException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public void printNotesFromRS()
+	{
+		try {
+			notes = store.getNotesFromRecordStore(ids);
+		} catch (RecordStoreNotOpenException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvalidRecordIDException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (RecordStoreException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		for (int i = 0; i < notes.length; i++)
+		{
+			System.out.println(notes[i].getNoteContent());
+		}
 	}
 	
 	public void commandAction(Command c, Displayable s)
 	{
 		if (s == loggedOutForm)
 		{
+			printNotesFromRS();
+			updateIds();
+			updateNotes(ids);
+			
 			if (c.getCommandType() == Command.OK)
 			{
 				/* TODO: verify password
 				 * => check if the note can be decrypted using the provided password */
 				if (passwordField.getString().equals("JAJA"))
 				{
-					note.getNoteContent();
+					noteText = store.getNoteStartingWithChars(notes, notePrefix);
+					updateNotePreview(noteText);
 					screen.setCurrent(loggedInForm);
 					passwordField.setString("");
 				}
@@ -132,19 +209,20 @@ public class SafeNotepad extends MIDlet implements CommandListener {
 		{
 			if (c.getCommandType() == Command.OK)
 			{
-				String newNoteText = noteField.getString();
-				note.setNoteContent(newNoteText);
+				System.out.println(newNoteField.getString());
+				note.setNoteContent(newNoteField.getString());
 				try {
-					store.editNote(note);
+					store.editNote(note, noteId);
 				} catch (RecordStoreException rse) {
 					rse.printStackTrace();
 				}
-				updateNotePreview();
-				screen.setCurrent(loggedInForm);
-			}
+				screen.setCurrent(loggedOutForm);
+				newNoteField.setString("");
+				printNotesFromRS();
+			 }
 			if (c.getCommandType() == Command.EXIT)
 			{
-				screen.setCurrent(loggedInForm);
+				screen.setCurrent(loggedOutForm);
 			}
 		}
 		
@@ -152,7 +230,7 @@ public class SafeNotepad extends MIDlet implements CommandListener {
 		{
 			if (c.getCommandType() == Command.OK)
 			{
-				if (!newPasswordField.getString().equals(""))
+				if (currentPasswordField.getString() == "JAJA" && !newPasswordField.getString().equals(""))
 				{
 					/* TODO: update password 
 					 * => reencrypt the note with the new password */
@@ -161,7 +239,7 @@ public class SafeNotepad extends MIDlet implements CommandListener {
 			}
 			
 			if (c.getCommandType() == Command.EXIT)
-				screen.setCurrent(loggedInForm);
+				screen.setCurrent(loggedOutForm);
 		}
 	}
 
