@@ -7,8 +7,6 @@ import javax.microedition.rms.RecordStoreException;
 import javax.microedition.rms.RecordStoreFullException;
 import javax.microedition.rms.RecordStoreNotOpenException;
 
-import org.bouncycastle.util.Store;
-
 public class DataManager {
 	private RecordStore stream;
 
@@ -40,8 +38,6 @@ public class DataManager {
 		{
 		    Note exampleNote = new Note("note=Somenote");
 		    createNote(exampleNote);
-		    Note exampleIV = new Note("iv=000102030405060708090a0b0c0d0e0f");
-		    createNote(exampleIV);
 		}
 	}
 	

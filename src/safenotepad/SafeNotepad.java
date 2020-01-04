@@ -12,14 +12,11 @@ public class SafeNotepad extends MIDlet implements CommandListener {
 	private Note note;
 	private String noteText;
 	private String newNoteText;
-	private Note iv;
 	private String placeholderNote = "Placeholder";
 	private String notePrefix = "note=";
-	private String ivPrefix = "iv=";
 	private int[] ids = new int[2];
 	private Note[] notes = new Note[2];
 	private int noteId;
-	private int ivId;
 	private TextField noteField;
 	private TextField newNoteField;
 	private TextField passwordField;
@@ -40,9 +37,7 @@ public class SafeNotepad extends MIDlet implements CommandListener {
 		store.populateEmptyRecordStore();
 		ids = store.getNoteIdsFromRecordStore();
 		noteId = store.getIdOfNoteStartingWithChars(ids, notePrefix);
-		ivId = store.getIdOfNoteStartingWithChars(ids, ivPrefix);
 		note = store.getNote(noteId);
-		iv = store.getNote(ivId);
 		
 		screen = Display.getDisplay(this);
 		loggedOutForm = new Form("Log in");
@@ -146,6 +141,7 @@ public class SafeNotepad extends MIDlet implements CommandListener {
 	{
 		try {
 			notes = store.getNotesFromRecordStore(ids);
+			System.out.println(notes.length);
 		} catch (RecordStoreNotOpenException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
