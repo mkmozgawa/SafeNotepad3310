@@ -1,11 +1,22 @@
 package safenotepad;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.ShortBufferException;
 import javax.microedition.rms.InvalidRecordIDException;
 import javax.microedition.rms.RecordEnumeration;
 import javax.microedition.rms.RecordStore;
 import javax.microedition.rms.RecordStoreException;
 import javax.microedition.rms.RecordStoreFullException;
 import javax.microedition.rms.RecordStoreNotOpenException;
+
+import org.bouncycastle.crypto.DataLengthException;
+import org.bouncycastle.crypto.InvalidCipherTextException;
 
 public class DataManager {
 	private RecordStore stream;
@@ -20,6 +31,10 @@ public class DataManager {
 		{
 			rse.printStackTrace();
 		}
+		catch (DataLengthException e)
+		{
+			System.out.println("what");
+		}
 	}
 	
 	public void deleteExistingRecords() throws RecordStoreException
@@ -32,64 +47,36 @@ public class DataManager {
 		}
 	}
 	
-	public void populateEmptyRecordStore() throws RecordStoreException
+	// this works because we assume to only have 1 note
+	public int getNoteId() throws RecordStoreException
 	{
-		if (stream.getNumRecords() == 0)
-		{
-		    Note exampleNote = new Note("note=Somenote");
-		    createNote(exampleNote);
-		}
-	}
-	
-	public int[] getNoteIdsFromRecordStore() throws RecordStoreNotOpenException, InvalidRecordIDException
-	{
-		int ids[] = new int[2];
-		RecordEnumeration renum = stream.enumerateRecords(null, null, false);
-		int i = 0;
-		while (renum.hasNextElement())
-		{
-			ids[i] = renum.nextRecordId();
-			i++;
-		}
-		return ids;
-	}
-	
-	public Note[] getNotesFromRecordStore(int ids[]) throws RecordStoreNotOpenException, InvalidRecordIDException, RecordStoreException
-	{
-		Note notes[] = new Note[ids.length];
-		for (int i = 0; i < ids.length; i++)
-		{
-			notes[i] = getNote(ids[i]);
-		}
-		return notes;
-	}
-	
-	public String getNoteStartingWithChars(Note[] notes, String chars)
-	{
-		for (int i = 0; i < notes.length; i++)
-		{
-			String noteString = notes[i].getNoteContent();
-			if (noteString.startsWith(chars))
+		try {
+			System.out.println("Number of records: "+stream.getNumRecords());
+			RecordEnumeration renum = stream.enumerateRecords(null, null, false);
+			if (renum.hasNextElement())
 			{
-				int start = chars.length();
-				return noteString.substring(start);
+				return renum.nextRecordId();
 			}
+			return -1000000;
 		}
-		return "";
-	}
-	
-	public int getIdOfNoteStartingWithChars(int ids[], String chars) throws RecordStoreNotOpenException, InvalidRecordIDException, RecordStoreException
-	{
-		for (int i = 0; i < ids.length; i++)
+		catch (RecordStoreException rse)
 		{
-			if (getNote(ids[i]).getNoteContent().startsWith(chars))
-			{
-				return ids[i];
-			}
+			rse.printStackTrace();
 		}
-		return -1;
+		return -1000000;
 	}
 	
+	public Note getOrCreateNote(String key) throws RecordStoreException
+	{
+		int noteId = getNoteId();
+		if (noteId == -1000000)
+		{
+			Note note = new Note("Example note");
+			createNote(note, key);
+			noteId = getNoteId();
+		}
+		return getNote(noteId);
+	}
 	
 	public Note getNote(int noteId) throws RecordStoreNotOpenException, InvalidRecordIDException, RecordStoreException
 	{
@@ -115,28 +102,62 @@ public class DataManager {
 	    
 	}
 	
-	public int createNote(Note note) throws RecordStoreException
+	public int createNote(Note note, String key) throws RecordStoreException
 	{
-		byte[] buffor = note.toByteArray();
 		try
 		{
-			int recordId = stream.addRecord(buffor,0,buffor.length);
+			byte[] buffor = note.toByteArray();
+			byte[] keyBytes = key.getBytes();
+			StringCipher cs = new StringCipher(keyBytes);
+			InputStream inputStream;
+			inputStream = new ByteArrayInputStream(buffor);
+			OutputStream encodedOutputStream = new ByteArrayOutputStream();
+			cs.encrypt(inputStream, encodedOutputStream);
+			ByteArrayOutputStream bais = (ByteArrayOutputStream) encodedOutputStream;
+	    	byte[] outputBytes = bais.toByteArray();
+			int recordId = stream.addRecord(outputBytes,0,outputBytes.length);
 			return recordId;
 		}
 		catch (RecordStoreException rse) 
 		{
 			rse.printStackTrace();
+		} catch (DataLengthException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ShortBufferException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalBlockSizeException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (BadPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalStateException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvalidCipherTextException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 		return -1000000;
 	}
 	
-	public void setNote(Note note, int noteId) 
+	public void setNote(Note note, int noteId, String key) 
 			throws RecordStoreFullException, RecordStoreException	
 	{
-		byte[] buffor = note.toByteArray();
 		try 
 		{
-			stream.setRecord(noteId, buffor, 0, buffor.length);
+			byte[] buffor = note.toByteArray();
+			byte[] keyBytes = key.getBytes();
+			StringCipher cs = new StringCipher(keyBytes);
+			InputStream inputStream;
+			inputStream = new ByteArrayInputStream(buffor);
+			OutputStream encodedOutputStream = new ByteArrayOutputStream();
+			cs.encrypt(inputStream, encodedOutputStream);
+			ByteArrayOutputStream bais = (ByteArrayOutputStream) encodedOutputStream;
+	    	byte[] outputBytes = bais.toByteArray();
+			stream.setRecord(noteId, outputBytes, 0, outputBytes.length);
 		}
 		catch (RecordStoreFullException rsfe)
 		{
@@ -145,23 +166,38 @@ public class DataManager {
 		catch (RecordStoreException rse)
 		{
 			rse.printStackTrace();
+		} catch (DataLengthException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ShortBufferException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalBlockSizeException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (BadPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalStateException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvalidCipherTextException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
 	
-	public void editNote(Note note, int noteId) throws RecordStoreException
+	public void editNote(Note note, String key) throws RecordStoreException
 	{
 		try {
-			setNote(note, noteId);				
+			int noteId = getNoteId();
+			System.out.println("Id rekordu:"+noteId);
+			setNote(note, noteId, key);				
 		}
 		catch (RecordStoreException rse)
 		{
 			rse.printStackTrace();
 		}
 	
-	}
-
-	private int getNoteId() {
-		// TODO Auto-generated method stub
-		return 0;
 	}
 }

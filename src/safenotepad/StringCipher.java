@@ -5,7 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
-import java.security.MessageDigest;
+import java.security.DigestException;
 import java.security.NoSuchAlgorithmException;
 
 import javax.crypto.BadPaddingException;
@@ -29,10 +29,6 @@ public class StringCipher {
 
     byte[] key = null;
 
-    public StringCipher(){
-        key = "SECRET_1SECRET_2SECRET_3".getBytes();
-        InitCiphers();
-    }
     public StringCipher(byte[] keyBytes){
         key = new byte[keyBytes.length];
         System.arraycopy(keyBytes, 0 , key, 0, keyBytes.length);
@@ -108,16 +104,13 @@ throws ShortBufferException,
     // testing the class
     public static void main(String[] args) {
 		try {
-			String secretKey = "supersecret";
+			String secretKey = "password";
 			byte[] secretKeyBytes = secretKey.getBytes("UTF-8");
-	    	MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
-	    	byte[] hashedKey = new byte[32];
-	    	messageDigest.update(secretKeyBytes, 0, secretKey.length());
-	    	messageDigest.update(hashedKey, 0, 32);
+	    	PassHasher pass = new PassHasher(secretKeyBytes);
+	    	byte[] hashedKey24 = Arrays.copyOfRange(pass.hashedPassBytes, 0, 24);
 	    	
-	    	byte[] hashedKey24 = Arrays.copyOfRange(hashedKey, 0, 24);
 	    	StringCipher cs = new StringCipher(hashedKey24);
-	    	String exampleString = "My super secret note";
+	    	String exampleString = "note";
 	    	InputStream inputStream;
 	    	System.out.println("Note: " + exampleString);
 	    		    	
@@ -136,7 +129,13 @@ throws ShortBufferException,
 	    	OutputStream decodedOutputStream = new ByteArrayOutputStream();
 	    	
 	    	//decrypt
-	    	cs.decrypt(encodedInput, decodedOutputStream);
+	    	String secretKey2 = "passworda";
+			byte[] secretKeyBytes2 = secretKey2.getBytes("UTF-8");
+            PassHasher pass2 = new PassHasher(secretKeyBytes2);
+            byte[] hashedKey242 = Arrays.copyOfRange(pass2.hashedPassBytes, 0, 24);
+            
+	    	StringCipher cs2 = new StringCipher(hashedKey242);
+	    	cs2.decrypt(encodedInput, decodedOutputStream);
 	    	System.out.println("Decoded note: " + decodedOutputStream.toString());
 	    	
 	    	
@@ -160,8 +159,11 @@ throws ShortBufferException,
 			e.printStackTrace();
 		} catch (InvalidCipherTextException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			System.out.println("The ciphertext couldn't be decrypted. Is the password right?");
 		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (DigestException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
